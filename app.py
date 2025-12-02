@@ -1,48 +1,49 @@
 Python 3.11.3 (tags/v3.11.3:f3909b8, Apr  4 2023, 23:49:59) [MSC v.1934 64 bit (AMD64)] on win32
 Type "help", "copyright", "credits" or "license()" for more information.
-import streamlit as st
-import pandas as pd
-import nltk
-from spellchecker import SpellChecker
-from nltk.tokenize import word_tokenize
-from nltk.tokenize.treebank import TreebankWordDetokenizer
-from io import StringIO
-import zipfile
-from datetime import datetime
-
-# ----------------------------------------
-# NLTK setup
-# ----------------------------------------
-def ensure_nltk():
-    try:
-        nltk.data.find("tokenizers/punkt")
-    except LookupError:
-        nltk.download("punkt")
-
-ensure_nltk()
-spell = SpellChecker()
-detok = TreebankWordDetokenizer()
-
-# ----------------------------------------
-# Spell-check logic
-# ----------------------------------------
-def process_text(text):
-    tokens = word_tokenize(text)
-    corrected_tokens = []
-    error_count = 0
-
-    for token in tokens:
-        if token.isalpha():
-            corrected = spell.correction(token)
-            if corrected.lower() != token.lower():
-                error_count += 1
-            corrected_tokens.append(corrected)
+>>> import streamlit as st
+... import pandas as pd
+... import nltk
+... from spellchecker import SpellChecker
+... from nltk.tokenize import word_tokenize
+... from nltk.tokenize.treebank import TreebankWordDetokenizer
+... import zipfile
+... import io
+... 
+... # ----------------------------------------
+... # NLTK Setup
+... # ----------------------------------------
+... def ensure_nltk():
+...     try:
+...         nltk.data.find("tokenizers/punkt")
+...     except LookupError:
+...         nltk.download("punkt")
+... 
+... ensure_nltk()
+... 
+... spell = SpellChecker()
+... detok = TreebankWordDetokenizer()
+... 
+... # ----------------------------------------
+... # Spell-check logic
+... # ----------------------------------------
+... def process_text(text):
+...     tokens = word_tokenize(text)
+...     corrected_tokens = []
+...     error_count = 0
+... 
+...     for token in tokens:
+...         if token.isalpha():
+...             corrected = spell.correction(token)
+...             if corrected.lower() != token.lower():
+...                 error_count += 1
+...             corrected_tokens.append(corrected)
         else:
             corrected_tokens.append(token)
 
     corrected_text = detok.detokenize(corrected_tokens)
-    return corrected_text, error_count, len([t for t in tokens if t.isalpha()])
+    total_words = len([t for t in tokens if t.isalpha()])
 
+    return corrected_text, error_count, total_words
 
 # ----------------------------------------
 # Streamlit UI
@@ -50,7 +51,7 @@ def process_text(text):
 st.title("🪄 Spelling Checker (Streamlit Version)")
 
 uploaded_files = st.file_uploader(
-    "텍스트(.txt) 파일 여러 개 업로드",
+    "텍스트 파일(.txt)을 여러 개 업로드하세요",
     type=["txt"],
     accept_multiple_files=True
 )
@@ -59,53 +60,49 @@ if uploaded_files:
     st.write(f"총 업로드 파일: **{len(uploaded_files)}개**")
 
     results = []
-    zip_buffer = StringIO()
-    text_outputs = {}
+    corrected_files = {}
 
+    # 파일 처리
     for file in uploaded_files:
         raw_text = file.read().decode("utf-8", errors="ignore")
-        corrected_text, err_cnt, real_words = process_text(raw_text)
-        error_rate = (err_cnt / real_words * 100) if real_words else 0
+        corrected_text, error_cnt, total_words = process_text(raw_text)
+        error_rate = (error_cnt / total_words * 100) if total_words else 0
 
         results.append({
             "filename": file.name,
-            "total_words": real_words,
-            "error_count": err_cnt,
-...             "error_rate(%)": round(error_rate, 2)
-...         })
-... 
-...         text_outputs[file.name] = corrected_text
-... 
-...     # Summary table
-...     df = pd.DataFrame(results)
-...     st.subheader("📊 Summary")
-...     st.dataframe(df)
-... 
-...     # Download CSV
-...     csv_data = df.to_csv(index=False).encode("utf-8")
-...     st.download_button(
-...         label="📥 Summary CSV 다운로드",
-...         data=csv_data,
-...         file_name="summary.csv",
-...         mime="text/csv"
-...     )
-... 
-...     # Download corrected files as ZIP
-...     zip_bytes = None
-...     import io
-...     zip_stream = io.BytesIO()
-...     with zipfile.ZipFile(zip_stream, "w") as zf:
-...         for fname, txt in text_outputs.items():
-...             zf.writestr(f"corrected_{fname}", txt)
-... 
-...     zip_bytes = zip_stream.getvalue()
-... 
-...     st.download_button(
-...         label="📥 수정된 파일 ZIP 다운로드",
-...         data=zip_bytes,
-...         file_name="corrected_files.zip",
-...         mime="application/zip"
-...     )
-... 
-... else:
-...     st.info("여러 개의 .txt 파일을 업로드하면 자동으로 오탈자 검사 및 교정이 진행됩니다.")
+            "total_words": total_words,
+            "error_count": error_cnt,
+            "error_rate(%)": round(error_rate, 2)
+        })
+
+        corrected_files[file.name] = corrected_text
+
+    # Summary 출력
+    df = pd.DataFrame(results)
+    st.subheader("📊 Summary")
+    st.dataframe(df)
+
+    # Summary CSV 다운로드
+    csv_data = df.to_csv(index=False).encode("utf-8")
+    st.download_button(
+        label="📥 Summary CSV 다운로드",
+        data=csv_data,
+        file_name="summary.csv",
+        mime="text/csv"
+    )
+
+    # 수정된 텍스트 파일 ZIP 다운로드
+    zip_stream = io.BytesIO()
+    with zipfile.ZipFile(zip_stream, "w") as zf:
+        for fname, content in corrected_files.items():
+            zf.writestr(f"corrected_{fname}", content)
+
+    st.download_button(
+        label="📥 수정된 텍스트 ZIP 다운로드",
+        data=zip_stream.getvalue(),
+        file_name="corrected_texts.zip",
+        mime="application/zip"
+    )
+
+else:
+    st.info("여러 개의 .txt 파일을 업로드하면 자동으로 맞춤법 교정이 이루어집니다.")

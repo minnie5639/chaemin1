@@ -1,42 +1,40 @@
-Python 3.11.3 (tags/v3.11.3:f3909b8, Apr  4 2023, 23:49:59) [MSC v.1934 64 bit (AMD64)] on win32
-Type "help", "copyright", "credits" or "license()" for more information.
->>> import streamlit as st
-... import pandas as pd
-... import nltk
-... from spellchecker import SpellChecker
-... from nltk.tokenize import word_tokenize
-... from nltk.tokenize.treebank import TreebankWordDetokenizer
-... import zipfile
-... import io
-... 
-... # ----------------------------------------
-... # NLTK Setup
-... # ----------------------------------------
-... def ensure_nltk():
-...     try:
-...         nltk.data.find("tokenizers/punkt")
-...     except LookupError:
-...         nltk.download("punkt")
-... 
-... ensure_nltk()
-... 
-... spell = SpellChecker()
-... detok = TreebankWordDetokenizer()
-... 
-... # ----------------------------------------
-... # Spell-check logic
-... # ----------------------------------------
-... def process_text(text):
-...     tokens = word_tokenize(text)
-...     corrected_tokens = []
-...     error_count = 0
-... 
-...     for token in tokens:
-...         if token.isalpha():
-...             corrected = spell.correction(token)
-...             if corrected.lower() != token.lower():
-...                 error_count += 1
-...             corrected_tokens.append(corrected)
+import streamlit as st
+import pandas as pd
+import nltk
+from spellchecker import SpellChecker
+from nltk.tokenize import word_tokenize
+from nltk.tokenize.treebank import TreebankWordDetokenizer
+import zipfile
+import io
+
+# ----------------------------------------
+# NLTK Setup
+# ----------------------------------------
+def ensure_nltk():
+    try:
+        nltk.data.find("tokenizers/punkt")
+    except LookupError:
+        nltk.download("punkt")
+
+ensure_nltk()
+
+spell = SpellChecker()
+detok = TreebankWordDetokenizer()
+
+# ----------------------------------------
+# Spell-check logic
+# ----------------------------------------
+def process_text(text):
+    tokens = word_tokenize(text)
+    corrected_tokens = []
+    error_count = 0
+
+    for token in tokens:
+        if token.isalpha():
+            corrected = spell.correction(token)
+            if corrected.lower() != token.lower():
+                error_count += 1
+            corrected_tokens.append(corrected)
         else:
             corrected_tokens.append(token)
 
@@ -62,7 +60,6 @@ if uploaded_files:
     results = []
     corrected_files = {}
 
-    # 파일 처리
     for file in uploaded_files:
         raw_text = file.read().decode("utf-8", errors="ignore")
         corrected_text, error_cnt, total_words = process_text(raw_text)
@@ -77,12 +74,10 @@ if uploaded_files:
 
         corrected_files[file.name] = corrected_text
 
-    # Summary 출력
     df = pd.DataFrame(results)
     st.subheader("📊 Summary")
     st.dataframe(df)
 
-    # Summary CSV 다운로드
     csv_data = df.to_csv(index=False).encode("utf-8")
     st.download_button(
         label="📥 Summary CSV 다운로드",
@@ -91,7 +86,6 @@ if uploaded_files:
         mime="text/csv"
     )
 
-    # 수정된 텍스트 파일 ZIP 다운로드
     zip_stream = io.BytesIO()
     with zipfile.ZipFile(zip_stream, "w") as zf:
         for fname, content in corrected_files.items():
